@@ -1,7 +1,5 @@
 {
     "require": {
-        "leequix/icecast-streamer": "1.0.0",
-        "azuracast/php-api-client": "*",
         "vlucas/phpdotenv": "^5.6"
     }
 }
