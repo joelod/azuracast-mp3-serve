@@ -1,7 +1,7 @@
 name: azuracast-mp3-serve
 type: php
 docroot: ""
-php_version: "8.0"
+php_version: "8.2"
 webserver_type: nginx-fpm
 router_http_port: "80"
 router_https_port: "443"
@@ -158,6 +158,7 @@ nodejs_version: "16"
 # through ddev-router, but it can be bound directly to localhost if specified here.
 
 # webimage_extra_packages: [php7.4-tidy, php-bcmath]
+webimage_extra_packages: [ffmpeg]
 # Extra Debian packages that are needed in the webimage can be added here
 
 # dbimage_extra_packages: [telnet,netcat]
