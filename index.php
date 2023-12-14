@@ -67,26 +67,6 @@ curl_setopt($ch, CURLOPT_INFILE, $fileHandle);
 // curl_setopt($ch, CURLOPT_INFILESIZE, filesize($filePath));
 curl_setopt($ch, CURLOPT_INFILESIZE, $chunkSize);
 
-/*
-// Execute cURL session
-$response = curl_exec($ch);
-
-// Check for errors
-if (curl_errno($ch)) {
-    echo 'Curl error: ' . curl_error($ch);
-} else {
-    echo 'File successfully sent to Icecast server.';
-}
-
-print_r($response);
-
-// Close cURL session
-curl_close($ch);
-
-// Close the MP3 file handle
-fclose($fileHandle);
-*/
-
 while (!feof($fileHandle)) {
     $data = fread($fileHandle, $chunkSize);
     curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
