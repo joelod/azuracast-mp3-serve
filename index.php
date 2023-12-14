@@ -32,53 +32,75 @@ if (!$fileHandle) {
     die('Unable to open the MP3 file.');
 }
 
-// Create cURL session
-$ch = curl_init();
-
-curl_setopt($ch, CURLOPT_URL, "http://$serverIp:$serverPort$serverMountPoint");
-curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'PUT');
-curl_setopt($ch, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
-curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-curl_setopt($ch, CURLOPT_HEADER, false);
-curl_setopt($ch, CURLOPT_HTTPHEADER, array(
-    'Host: ' . $serverIp . ':' . $serverPort,
-    'Authorization: Basic ' . base64_encode($username . ':' . $password),
-    'Transfer-Encoding: chunked',
-    'Content-Type: ' . 'audio/mpeg',
-    'Ice-Public: ' . '1',
-    'Ice-Name: ' . 'FT-033',
-    'Ice-Description: ' . '',
-    'Ice-URL: ' . 'https://radioparanoia1000.com',
-    'Connection: Keep-Alive',
-    'Content-Length: ' . $fileSize,
-    'Ice-Bitrate: ' . $bitrate
-));
-
-curl_setopt($ch, CURLOPT_VERBOSE, true);
-curl_setopt($ch, CURLOPT_STDERR, fopen('php://stderr', 'w'));
-
-// Tell cURL that we want to send a PUT request
-curl_setopt($ch, CURLOPT_PUT, true);
-
-// Tell cURL that we want to send the contents of $fileHandle to the server
-curl_setopt($ch, CURLOPT_INFILE, $fileHandle);
-
-
-// We're going to "PUT" this information
-// curl_setopt($ch, CURLOPT_INFILESIZE, filesize($filePath));
-curl_setopt($ch, CURLOPT_INFILESIZE, $chunkSize);
-
-while (!feof($fileHandle)) {
-    $data = fread($fileHandle, $chunkSize);
-    curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
-    curl_exec($ch);
-
-    // Wait for 1 second
-    sleep(1);
-
-    echo 'Sending ' . $chunkSize . ' bytes' . PHP_EOL;
+// Create a socket connection
+$socket = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
+if ($socket === false) {
+    die('Unable to create socket: ' . socket_strerror(socket_last_error()));
 }
 
+// Connect to the server
+$connection = socket_connect($socket, $serverIp, $serverPort);
+if ($connection === false) {
+    die('Unable to connect to server: ' . socket_strerror(socket_last_error()));
+}
+
+// Send headers
+$headers  = 'PUT ' . $serverMountPoint . ' HTTP/1.1' . PHP_EOL;
+$headers .= 'Host: ' . $serverIp . ':' . $serverPort . PHP_EOL;
+$headers .= 'Authorization: Basic ' . base64_encode($username.":".$password) . PHP_EOL;
+$headers .= 'Transfer-Encoding: chunked' . PHP_EOL;
+$headers .= 'Content-Type: audio/mpeg' . PHP_EOL;
+$headers .= 'Ice-Public: 1' . PHP_EOL;
+$headers .= 'Ice-Name: FT-033' . PHP_EOL;
+$headers .= 'Ice-Description: ?' . PHP_EOL;
+$headers .= 'Ice-URL: https://radioparanoia1000.com' . PHP_EOL;
+$headers .= 'Ice-Genre: ambient' . PHP_EOL;
+$headers .= 'Ice-Bitrate: ' . $bitrate . PHP_EOL;
+$headers .= 'Expect: 100-continue' . PHP_EOL . PHP_EOL;
+
+// Send headers
+socket_write($socket, $headers, strlen($headers));
+
+// Read the response
+
+$response = socket_read($socket, 4096);
+
+echo $response;
+// Send the MP3 file in chunks
+
+$contents = '';
+
+while (!feof($fileHandle)) {
+    echo 'Sending chunk...' . PHP_EOL;
+    $contents .= fread($fileHandle, 8192);
+
+    echo 'Chunk size: ' . strlen($contents) . PHP_EOL;
+
+    $chunk = dechex(strlen($contents)) . PHP_EOL . $contents . PHP_EOL;
+
+    // echo 'Chunk: ' . $chunk . PHP_EOL;
+
+    socket_write($socket, $chunk, strlen($chunk));
+
+    echo 'Waiting for response...' . PHP_EOL;
+
+    $response = socket_read($socket, 4096);
+
+    echo 'Response: ' . $response . PHP_EOL;
+
+    sleep(1);
+}
+
+
+
+// Send the last chunk
+$chunk = '0' . PHP_EOL . PHP_EOL;
+socket_write($socket, $chunk, strlen($chunk));
+
+// Close the socket
+socket_close($socket);
+
+// Close the file
 fclose($fileHandle);
-curl_close($ch);
+
 ?>
