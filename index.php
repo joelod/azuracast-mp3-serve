@@ -51,6 +51,7 @@ curl_setopt($ch, CURLOPT_HTTPHEADER, array(
     'Ice-URL: ' . 'https://radioparanoia1000.com',
     'Connection: Keep-Alive',
     'Content-Length: ' . $fileSize,
+    'Ice-Bitrate: ' . $bitrate
 ));
 
 curl_setopt($ch, CURLOPT_VERBOSE, true);
@@ -71,9 +72,11 @@ while (!feof($fileHandle)) {
     $data = fread($fileHandle, $chunkSize);
     curl_setopt($ch, CURLOPT_POSTFIELDS, $data);
     curl_exec($ch);
-    
+
     // Wait for 1 second
     sleep(1);
+
+    echo 'Sending ' . $chunkSize . ' bytes' . PHP_EOL;
 }
 
 fclose($fileHandle);
