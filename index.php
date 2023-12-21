@@ -17,25 +17,33 @@ $password = $_ENV['PASSWORD'];
 $originalFilePath = $_ENV['FILE_PATH'];
 $convertedFilePath = __DIR__ . '/converted.mp3';
 
-if ($serverIp == null || $serverPort == null || $serverMountPoint == null || $username == null || $password == null || $originalFilePath == null) {
+if ($serverIp == null || $serverPort == null || $username == null || $password == null || $originalFilePath == null) {
     die('Please set all environment variables.');
 }
 
 // Convert the MP3 file to a constant bitrate of $bitrate VBR MP3 file
-$bitrate = 192;
+$bitrate = 128;
+$convert = true;
 $ffmpeg = FFMpeg::create();
-$audio = $ffmpeg->open($originalFilePath);
-$format = new Mp3();
-$format->setAudioKiloBitrate($bitrate);
 
-echo '[' . date('H:i:s') . '] Converting MP3 file to ' . $bitrate . ' kbps MP3 file...' . PHP_EOL;
-$audio->save($format, $convertedFilePath);
-echo '[' . date('H:i:s') . '] Converted MP3 file to ' . $bitrate . ' kbps MP3 file! Took ' . round(microtime(true) - $_SERVER['REQUEST_TIME_FLOAT'], 2) . ' seconds.' . PHP_EOL;
+if ($convert) {
+    $audio = $ffmpeg->open($originalFilePath);
+    $format = new Mp3();
+    $format->setAudioKiloBitrate($bitrate);
+
+    echo '[' . date('H:i:s') . '] Converting MP3 file to ' . $bitrate . ' kbps MP3 file...' . PHP_EOL;
+    $audio->save($format, $convertedFilePath);
+    echo '[' . date('H:i:s') . '] Converted MP3 file to ' . $bitrate . ' kbps MP3 file! Took ' . round(microtime(true) - $_SERVER['REQUEST_TIME_FLOAT'], 2) . ' seconds.' . PHP_EOL;
 
 
-// Open the converted MP3 file for reading
-$fileHandle = fopen($convertedFilePath, 'r');
-$fileSize = filesize($convertedFilePath);
+    // Open the converted MP3 file for reading
+    $fileHandle = fopen($convertedFilePath, 'r');
+    $fileSize = filesize($convertedFilePath);
+} else {
+    // Open the original MP3 file for reading
+    $fileHandle = fopen($originalFilePath, 'r');
+    $fileSize = filesize($originalFilePath);
+}
 
 if (!$fileHandle) {
     die('Unable to open the converted MP3 file.');
@@ -54,17 +62,21 @@ if ($connection === false) {
 }
 
 // Send headers
-$headers = "PUT $serverMountPoint HTTP/1.1\r\n";
-$headers .= "Host: $serverIp:$serverPort\r\n";
-$headers .= "Authorization: Basic " . base64_encode("$username:$password") . "\r\n";
-$headers .= "User-Agent: PHP Icecast Client\r\n";
-$headers .= "Content-Type: audio/mpeg\r\n";
-$headers .= "Ice-Public: 1\r\n";
-$headers .= "Ice-Name: Teststream\r\n";
-$headers .= "Ice-Description: This is just a simple test stream\r\n";
-$headers .= "Ice-URL: http://radioparanoia1000.com\r\n";
-$headers .= "Ice-Genre: Ambient\r\n";
-$headers .= "Expect: 100-continue\r\n\r\n";
+$headers = "PUT $serverMountPoint HTTP/1.1" . PHP_EOL;
+$headers .= "Host: $serverIp:$serverPort" . PHP_EOL;
+$headers .= "Authorization: Basic " . base64_encode("$username:$password") . "" . PHP_EOL;
+$headers .= "User-Agent: PHP Icecast Client" . PHP_EOL;
+$headers .= "Content-Type: audio/mpeg" . PHP_EOL;
+$headers .= "Ice-Public: 0" . PHP_EOL;
+$headers .= "Ice-Name: Teststream" . PHP_EOL;
+$headers .= "Ice-Title: Teststream" . PHP_EOL;
+$headers .= "Title: Teststream" . PHP_EOL;
+
+$headers .= "Ice-Description: This is just a simple test stream" . PHP_EOL;
+$headers .= "Ice-URL: http://radioparanoia1000.com" . PHP_EOL;
+$headers .= "Ice-Genre: Ambient" . PHP_EOL;
+$headers .= "Ice-Bitrate: $bitrate" . PHP_EOL;
+$headers .= "Expect: 100-continue" . PHP_EOL . PHP_EOL;
 
 // Send headers
 socket_write($socket, $headers, strlen($headers));
@@ -77,12 +89,19 @@ if (strpos($response, "HTTP/1.1 100 Continue") === false && strpos($response, "H
     die('Unexpected response: ' . $response);
 }
 
+echo $response . PHP_EOL;
+
+$bytesPerSecond = ($bitrate * 1000) / 8;
+$seconds = $fileSize / $bytesPerSecond;
+
 // Send the MP3 file in constant $bitrate kbps chunks
-while ($data = fread($fileHandle, 24567)) {
-    socket_write($socket, $data, strlen($data));
-    echo '[' . date('H:i:s') . '] Sending ' . strlen($data) . ' bytes of data!' . PHP_EOL;
-    usleep(1000000); // Sleep for 1 second
+while (!feof($fileHandle)) {
+    $chunk = fread($fileHandle, $bytesPerSecond);
+    socket_write($socket, $chunk, strlen($chunk));
+    echo '[' . date('H:i:s') . '] Sent ' . round(ftell($fileHandle) / $fileSize * 100, 2) . '% of the MP3 file...' . PHP_EOL;
+    sleep(1);
 }
+
 
 // Close the file handle
 fclose($fileHandle);
@@ -91,4 +110,6 @@ fclose($fileHandle);
 socket_close($socket);
 
 // Delete the converted file after streaming
-unlink($convertedFilePath);
+if ($convert) {
+    unlink($convertedFilePath);
+}
