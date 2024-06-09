@@ -23,7 +23,7 @@ if ($serverIp == null || $serverPort == null || $username == null || $password =
 
 // Convert the MP3 file to a constant bitrate of $bitrate VBR MP3 file
 $bitrate = 128;
-$convert = true;
+$convert = false;
 $ffmpeg = FFMpeg::create();
 
 if ($convert) {
@@ -92,7 +92,7 @@ if (strpos($response, "HTTP/1.1 100 Continue") === false && strpos($response, "H
 echo $response . PHP_EOL;
 
 $bytesPerSecond = ($bitrate * 1000) / 8;
-$seconds = $fileSize / $bytesPerSecond;
+// $seconds = $fileSize / $bytesPerSecond;
 
 // Send the MP3 file in constant $bitrate kbps chunks
 while (!feof($fileHandle)) {
@@ -101,7 +101,6 @@ while (!feof($fileHandle)) {
     echo '[' . date('H:i:s') . '] Sent ' . round(ftell($fileHandle) / $fileSize * 100, 2) . '% of the MP3 file...' . PHP_EOL;
     sleep(1);
 }
-
 
 // Close the file handle
 fclose($fileHandle);
